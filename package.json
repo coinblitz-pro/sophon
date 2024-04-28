@@ -1,0 +1,14 @@
+{
+  "private": true,
+  "scripts": {
+    "start": "node -r esbuild-register src/index.ts"
+  },
+  "dependencies": {
+    "@types/node": "^20.12.7",
+    "axios": "^1.6.8",
+    "dayjs": "^1.11.11",
+    "esbuild": "^0.20.2",
+    "esbuild-register": "^3.5.0",
+    "ethers": "^6.12.0"
+  }
+}
