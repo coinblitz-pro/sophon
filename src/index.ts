@@ -119,4 +119,4 @@ async function worker(key: string, maxTier: number, amount: bigint) {
   }
 }
 
-main().then(() => process.exit(1))
+main()
