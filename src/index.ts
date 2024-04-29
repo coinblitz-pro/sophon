@@ -3,6 +3,8 @@ import { AbiCoder, ethers, formatEther, JsonRpcProvider, parseEther, parseUnits,
 import { abis } from './constants'
 import { log, pinch, sleep } from './utils'
 
+const maxFeePerGas = parseUnits('7.5', 'gwei')
+const maxPriorityFeePerGas = parseUnits('7', 'gwei')
 
 const provider = new JsonRpcProvider('https://mainnet.era.zksync.io')
 const multicall = new ethers.Contract('0xF9cda624FBC7e059355ce98a31693d299FACd963', abis.multicall3, provider)
@@ -95,8 +97,7 @@ async function worker(key: string, maxTier: number, amount: bigint, withPromo: b
 
   let nonce = await signer.getNonce()
   const allocation = parseEther('1') * amount
-  const gasLimit = 1000000
-  const gasPrice = parseUnits('5.051', 'gwei')
+  const gasLimit = withPromo ? 1500000 : 1250000
   const startedAt = dayjs('2024-04-30T10:59:59+02:00').unix() * 1000 + 500
 
   while (true) {
@@ -121,13 +122,13 @@ async function worker(key: string, maxTier: number, amount: bigint, withPromo: b
         const data = withPromo
           ? '0xa54bd56d' + coder.encode([ 'uint256', 'bytes32[]', 'uint256', 'string' ], [ price, [], allocation, code ]).slice(2)
           : '0x2316448c' + coder.encode([ 'uint256', 'bytes32[]', 'uint256' ], [ price, [], allocation ]).slice(2)
-        const tx = await signer.sendTransaction({ to: shop.address, data, nonce, gasLimit, gasPrice })
+        const tx = await signer.sendTransaction({ to: shop.address, data, nonce, gasLimit, maxFeePerGas, maxPriorityFeePerGas })
         log(`💸 attempted to buy tier.${i + 1} by https://era.zksync.network/tx/${tx.hash}`)
         await tx.wait()
         log(`💰 successfully bought`)
         return
       } catch (e) {
-        log('❌ failed to buy, next attempt', e)
+        log('❌ failed to buy, next attempt')
         nonce += 1
         break
       }
