@@ -44,7 +44,16 @@ async function main() {
   const withPromo = args[3] === '1'
 
   observe().then(() => console.log('👀 start observing'))
-  await Promise.all(keys.split(',').map(key => worker(key, maxTier, amount, withPromo)))
+
+  await Promise.all(keys.split(',').map(key => prepare(key, maxTier, amount)))
+
+  const border = dayjs('2024-04-30T10:59:00+02:00')
+  while (dayjs().isBefore(border)) {
+    process.stdout.write(`\r⏳ waiting for the start... ${border.diff(dayjs(), 'second')}s`)
+    await sleep(100)
+  }
+
+  await Promise.all(keys.split(',').map(key => bay(key, maxTier, amount, withPromo)))
 }
 
 async function observe() {
@@ -65,12 +74,9 @@ async function observe() {
   }
 }
 
-async function worker(key: string, maxTier: number, amount: bigint, withPromo: boolean) {
-  const coder = AbiCoder.defaultAbiCoder()
+async function prepare(key: string, maxTier: number, amount: bigint) {
   const signer = new ethers.Wallet(key).connect(provider)
-  const code = pinch(codes)
-
-  log(`🔑 using wallet ${signer.address}`)
+  log(`🔑 load wallet ${signer.address}`)
 
   const WETH = new ethers.Contract('0x5aea5775959fbc2557cc8789bc1bf90a239d9a91', abis.erc20, signer)
   const balance = await WETH.balanceOf(signer.address)
@@ -90,12 +96,12 @@ async function worker(key: string, maxTier: number, amount: bigint, withPromo: b
       log(`🔓 approved by https://era.zksync.network/tx/${tx.hash}`)
     }
   }
+}
 
-  const border = dayjs('2024-04-30T10:59:00+02:00')
-  while (dayjs().isBefore(border)) {
-    process.stdout.write(`\r⏳ waiting for the start... ${border.diff(dayjs(), 'second')}s`)
-    await sleep(100)
-  }
+async function bay(key: string, maxTier: number, amount: bigint, withPromo: boolean) {
+  const coder = AbiCoder.defaultAbiCoder()
+  const signer = new ethers.Wallet(key).connect(provider)
+  const code = pinch(codes)
 
   let nonce = await signer.getNonce()
   const allocation = parseEther('1') * amount
