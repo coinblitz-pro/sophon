@@ -124,7 +124,12 @@ async function worker(key: string, maxTier: number, amount: bigint, withPromo: b
           : '0x2316448c' + coder.encode([ 'uint256', 'bytes32[]', 'uint256' ], [ price, [], allocation ]).slice(2)
         const tx = await signer.sendTransaction({ to: shop.address, data, nonce, gasLimit, maxFeePerGas, maxPriorityFeePerGas })
         log(`💸 attempted to buy tier.${i + 1} by https://era.zksync.network/tx/${tx.hash}`)
-        await tx.wait()
+        while (true) {
+          const receipt = await provider.getTransactionReceipt(tx.hash)
+          if (receipt?.status === 0) {
+            throw new Error('transaction failed')
+          }
+        }
         log(`💰 successfully bought`)
         return
       } catch (e) {
@@ -136,4 +141,4 @@ async function worker(key: string, maxTier: number, amount: bigint, withPromo: b
   }
 }
 
-main()
+main().then(() => process.exit(0))
