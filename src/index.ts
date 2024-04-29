@@ -70,6 +70,8 @@ async function worker(key: string, maxTier: number, amount: bigint, withPromo: b
   const signer = new ethers.Wallet(key).connect(provider)
   const code = pinch(codes)
 
+  log(`🔑 using wallet ${signer.address}`)
+
   const WETH = new ethers.Contract('0x5aea5775959fbc2557cc8789bc1bf90a239d9a91', abis.erc20, signer)
   const balance = await WETH.balanceOf(signer.address)
   if (balance < shops[maxTier - 1].price * amount) {
