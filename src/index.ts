@@ -1,35 +1,48 @@
 import dayjs from 'dayjs'
 import { AbiCoder, ethers, formatEther, JsonRpcProvider, parseEther, parseUnits, TransactionResponse } from 'ethers'
 import { abis } from './constants'
-import { log, sleep } from './utils'
+import { log, pinch, sleep } from './utils'
 
 
 const provider = new JsonRpcProvider('https://mainnet.era.zksync.io')
 const multicall = new ethers.Contract('0xF9cda624FBC7e059355ce98a31693d299FACd963', abis.multicall3, provider)
 
 const shops = [
-  { address: '0xc9110f53c042a61d1b0f95342e61d62714f8a2e6', price: parseEther('0.0813'), allocation: parseEther('162'), available: true },
-  { address: '0x11b2669a07a0d17555a7ab54c0c37f5c8655a739', price: parseEther('0.0915'), allocation: parseEther('183'), available: true },
-  { address: '0x58078e429a99478304a25b2ab03abe79199be618', price: parseEther('0.1030'), allocation: parseEther('257'), available: true },
-  { address: '0x2e89cae8f6532687b015f4ba320f57c77920b451', price: parseEther('0.1158'), allocation: parseEther('361'), available: true },
-  { address: '0x396ea0670e3112bc344791ee7931a5a55e0bdbd1', price: parseEther('0.1303'), allocation: parseEther('407'), available: true },
+  { address: '0xc9110f53c042a61d1b0f95342e61d62714f8a2e6', price: parseEther('0.0813'), limit: parseEther('10'), quantity: parseEther('162'), available: true },
+  { address: '0x11b2669a07a0d17555a7ab54c0c37f5c8655a739', price: parseEther('0.0915'), limit: parseEther('10'), quantity: parseEther('183'), available: true },
+  { address: '0x58078e429a99478304a25b2ab03abe79199be618', price: parseEther('0.1030'), limit: parseEther('10'), quantity: parseEther('257'), available: true },
+  { address: '0x2e89cae8f6532687b015f4ba320f57c77920b451', price: parseEther('0.1158'), limit: parseEther('10'), quantity: parseEther('361'), available: true },
+  { address: '0x396ea0670e3112bc344791ee7931a5a55e0bdbd1', price: parseEther('0.1303'), limit: parseEther('10'), quantity: parseEther('407'), available: true },
+]
+
+const codes = [
+  '0xf78a9747327f330E33ce956048F1CAaf70830c63',
+  '0x7871399Ca71A0E917BF3a261B71Ac0CA26Ec83De',
+  '0x65E0a0C54C7891e3cE38044Aa9976927614BC113',
+  '0x817C1Fb413eE7651265a2ABcAF56702Ac1735e3F',
+  '0x4703394ae5DAa27bc48A84dC442f477d486e3126',
+  '0x3AAc984b3ff582A96aF45122A918a24E6434C9a3',
+  '0x0C07E9E542742B4faaECA816aa9426a4E880EdbB',
+  '0x116D9407E8891913D15dc91eCDc3d2227e85396E',
+  '0xA1241aBA1c92473B7db0b82EE1e9137289bea2a7',
 ]
 
 async function main() {
   const args = process.argv.slice(2)
 
   if (args.length < 3) {
-    log('📝 usage: npm start <max_tier_to_bay> <amount_to_bay> <keys_separated_by_comma>')
-    log('          npm start 1 10 0x,0x')
+    log('📝 usage: npm start <max_tier_to_bay> <amount_to_bay> <keys_separated_by_comma> <with_promo>')
+    log('          npm start 1 10 0x,0x 1')
     return
   }
 
   const maxTier = parseInt(args[0])
   const amount = BigInt(args[1])
   const keys = args[2]
+  const withPromo = args[3] === '1'
 
   observe().then(() => console.log('👀 start observing'))
-  await Promise.all(keys.split(',').map(key => worker(key, maxTier, amount)))
+  await Promise.all(keys.split(',').map(key => worker(key, maxTier, amount, withPromo)))
 }
 
 async function observe() {
@@ -43,21 +56,22 @@ async function observe() {
     const data: [] = await multicall.aggregate3.staticCall(shops.map(shop => ({ target: shop.address, allowFailure: true, callData: '0x1d6a4581' })))
     for (let i = 0; i < data.length; i++) {
       const shop = shops[i]
-      shop.available = BigInt(data[i][1]) < shop.allocation
+      shop.available = BigInt(data[i][1]) < shop.quantity
     }
 
     setTimeout(() => log('👀 available tiers:', shops.filter(shop => shop.available).map(shop => shops.indexOf(shop) + 1).join(', ') || 'none'), 0)
   }
 }
 
-async function worker(key: string, maxTier: number, amount: bigint) {
+async function worker(key: string, maxTier: number, amount: bigint, withPromo: boolean) {
   const coder = AbiCoder.defaultAbiCoder()
   const signer = new ethers.Wallet(key).connect(provider)
+  const code = pinch(codes)
 
   const WETH = new ethers.Contract('0x5aea5775959fbc2557cc8789bc1bf90a239d9a91', abis.erc20, signer)
   const balance = await WETH.balanceOf(signer.address)
   if (balance < shops[maxTier - 1].price * amount) {
-    console.error(`❌ not enough WETH for x${amount} tier.${maxTier} (${formatEther(shops[maxTier - 1].price)} ETH)`)
+    log(`❌ not enough WETH for x${amount} tier.${maxTier} (${formatEther(shops[maxTier - 1].price)} ETH)`)
     return
   }
 
@@ -104,7 +118,9 @@ async function worker(key: string, maxTier: number, amount: bigint) {
       }
 
       try {
-        const data = '0x2316448c' + coder.encode([ 'uint256', 'bytes32[]', 'uint256' ], [ price, [], allocation ]).slice(2)
+        const data = withPromo
+          ? '0xa54bd56d' + coder.encode([ 'uint256', 'bytes32[]', 'uint256', 'string' ], [ price, [], allocation, code ]).slice(2)
+          : '0x2316448c' + coder.encode([ 'uint256', 'bytes32[]', 'uint256' ], [ price, [], allocation ]).slice(2)
         const tx = await signer.sendTransaction({ to: shop.address, data, nonce, gasLimit, gasPrice })
         log(`💸 attempted to buy tier.${i + 1} by https://era.zksync.network/tx/${tx.hash}`)
         await tx.wait()
