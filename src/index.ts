@@ -1,10 +1,10 @@
 import dayjs from 'dayjs'
 import { AbiCoder, ethers, formatEther, JsonRpcProvider, parseEther, parseUnits, TransactionResponse } from 'ethers'
 import { abis } from './constants'
-import { log, pinch, sleep } from './utils'
+import { log, sleep } from './utils'
 
 const maxFeePerGas = parseUnits('7.5', 'gwei')
-const maxPriorityFeePerGas = parseUnits('7', 'gwei')
+const maxPriorityFeePerGas = parseUnits('7.5', 'gwei')
 
 const provider = new JsonRpcProvider('https://mainnet.era.zksync.io')
 const multicall = new ethers.Contract('0xF9cda624FBC7e059355ce98a31693d299FACd963', abis.multicall3, provider)
