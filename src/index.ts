@@ -17,31 +17,18 @@ const shops = [
   { address: '0x396ea0670e3112bc344791ee7931a5a55e0bdbd1', price: parseEther('0.1303'), limit: parseEther('10'), quantity: parseEther('407'), available: true },
 ]
 
-const codes = [
-  '0xf78a9747327f330E33ce956048F1CAaf70830c63',
-  '0x7871399Ca71A0E917BF3a261B71Ac0CA26Ec83De',
-  '0x65E0a0C54C7891e3cE38044Aa9976927614BC113',
-  '0x817C1Fb413eE7651265a2ABcAF56702Ac1735e3F',
-  '0x4703394ae5DAa27bc48A84dC442f477d486e3126',
-  '0x3AAc984b3ff582A96aF45122A918a24E6434C9a3',
-  '0x0C07E9E542742B4faaECA816aa9426a4E880EdbB',
-  '0x116D9407E8891913D15dc91eCDc3d2227e85396E',
-  '0xA1241aBA1c92473B7db0b82EE1e9137289bea2a7',
-]
-
 async function main() {
   const args = process.argv.slice(2)
 
   if (args.length < 3) {
-    log('📝 usage: npm start <max_tier_to_bay> <amount_to_bay> <keys_separated_by_comma> <with_promo>')
-    log('          npm start 1 10 0x,0x 1')
+    log('📝 usage: npm start <max_tier_to_bay> <amount_to_bay> <keys_separated_by_comma>')
+    log('          npm start 1 10 0x,0x')
     return
   }
 
   const maxTier = parseInt(args[0])
   const amount = BigInt(args[1])
   const keys = args[2]
-  const withPromo = args[3] === '1'
 
   observe().then(() => console.log('👀 start observing'))
 
@@ -53,7 +40,7 @@ async function main() {
     await sleep(100)
   }
 
-  await Promise.all(keys.split(',').map(key => bay(key, maxTier, amount, withPromo)))
+  await Promise.all(keys.split(',').map(key => bay(key, maxTier, amount)))
 }
 
 async function observe() {
@@ -98,14 +85,13 @@ async function prepare(key: string, maxTier: number, amount: bigint) {
   }
 }
 
-async function bay(key: string, maxTier: number, amount: bigint, withPromo: boolean) {
+async function bay(key: string, maxTier: number, amount: bigint) {
   const coder = AbiCoder.defaultAbiCoder()
   const signer = new ethers.Wallet(key).connect(provider)
-  const code = pinch(codes)
 
   let nonce = await signer.getNonce()
   const allocation = parseEther('1') * amount
-  const gasLimit = withPromo ? 1500000 : 1250000
+  const gasLimit = 1500000
   const startedAt = dayjs('2024-04-30T10:59:59+02:00').unix() * 1000 + 500
 
   while (true) {
@@ -127,9 +113,7 @@ async function bay(key: string, maxTier: number, amount: bigint, withPromo: bool
       }
 
       try {
-        const data = withPromo
-          ? '0xa54bd56d' + coder.encode([ 'uint256', 'bytes32[]', 'uint256', 'string' ], [ price, [], allocation, code ]).slice(2)
-          : '0x2316448c' + coder.encode([ 'uint256', 'bytes32[]', 'uint256' ], [ price, [], allocation ]).slice(2)
+        const data = '0xa54bd56d' + coder.encode([ 'uint256', 'bytes32[]', 'uint256', 'string' ], [ price, [], allocation, 'Sophon1' ]).slice(2)
         const tx = await signer.sendTransaction({ to: shop.address, data, nonce, gasLimit, maxFeePerGas, maxPriorityFeePerGas })
         log(`💸 attempted to buy tier.${i + 1} by https://era.zksync.network/tx/${tx.hash}`)
         while (true) {
